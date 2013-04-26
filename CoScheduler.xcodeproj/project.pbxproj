@@ -10,6 +10,7 @@
 		7F6E666416FDE65000A09B38 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7F6E666316FDE65000A09B38 /* main.cpp */; };
 		7F6E666616FDE65000A09B38 /* CoScheduler.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = 7F6E666516FDE65000A09B38 /* CoScheduler.1 */; };
 		7F6E667616FE729A00A09B38 /* libcondorapi.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 7F6E667516FE729A00A09B38 /* libcondorapi.dylib */; };
+		7F7726D3172A6CB700C9D919 /* submission.h in Headers */ = {isa = PBXBuildFile; fileRef = 7F7726D2172A6CB700C9D919 /* submission.h */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -34,6 +35,7 @@
 		7F6E666E16FDE6B300A09B38 /* user_log.c++.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "user_log.c++.h"; sourceTree = "<group>"; };
 		7F6E666F16FDE6BB00A09B38 /* write_user_log.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = write_user_log.h; sourceTree = "<group>"; };
 		7F6E667516FE729A00A09B38 /* libcondorapi.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libcondorapi.dylib; path = "../../Downloads/condor-7.8.7/src/condor_utils/libcondorapi.dylib"; sourceTree = "<group>"; };
+		7F7726D2172A6CB700C9D919 /* submission.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = submission.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -69,6 +71,7 @@
 			isa = PBXGroup;
 			children = (
 				7F6E666316FDE65000A09B38 /* main.cpp */,
+				7F7726D2172A6CB700C9D919 /* submission.h */,
 				7F6E666C16FDE69F00A09B38 /* condor_event.h */,
 				7F6E666E16FDE6B300A09B38 /* user_log.c++.h */,
 				7F6E666D16FDE6AB00A09B38 /* read_user_log.h */,
@@ -85,6 +88,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7F7726D3172A6CB700C9D919 /* submission.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -215,6 +219,7 @@
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"$(SRCROOT)/../../Downloads/condor-7.8.7/src/condor_utils\"",
+					"\"$(SRCROOT)/CoScheduler\"",
 				);
 				MACH_O_TYPE = mh_execute;
 				"OTHER_LDFLAGS[arch=*]" = "-lcondorapi";
@@ -230,6 +235,7 @@
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"$(SRCROOT)/../../Downloads/condor-7.8.7/src/condor_utils\"",
+					"\"$(SRCROOT)/CoScheduler\"",
 				);
 				MACH_O_TYPE = mh_execute;
 				"OTHER_LDFLAGS[arch=*]" = "-lcondorapi";
