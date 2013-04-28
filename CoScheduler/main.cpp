@@ -19,9 +19,9 @@ ofstream output;
 int main(int argc, char **argv)      {
 	
 	//make sure count is zero here, for control flow purpose
-	int k=3,count=0, returnValue=0, sumOfK=0;
+	int k=3,count=0, returnValue=0, sumOfK=0, degradation=1, dCount=0;
 	float c1=2,c2=1.20;
-	unsigned long int T1=0,T2=0,tmp=0;
+	unsigned long int T1=0,T2=0,tmp=0, oldT2=0;
 	output.open("output.txt", std::ofstream::out | std::ofstream::app);
 	
 	//Submit and wait
@@ -56,8 +56,8 @@ int main(int argc, char **argv)      {
 	//Clear host.log
 	ofstream clear("host.log",ios::trunc);
 	clear.close();
-	
 	sleep(5);
+	
     while(1)
 	{
 		cout.flush();
@@ -66,6 +66,17 @@ int main(int argc, char **argv)      {
 		if(T2 < c2*T1 || count==0)	{
 			
 			k=c1*k; // If there is no degradation increase number of jobs submitted
+			
+			
+			
+			
+			if(k==degradation)	{
+
+				k = k/c1;
+				if(k<1)
+					k=1;
+			}
+
 			sumOfK+=k;
 			submission s2(k);
 			returnValue=s2.submit();
@@ -94,11 +105,20 @@ int main(int argc, char **argv)      {
 			sleep(5);
 
 			//After every two rounds of run, calculate global average time T1
-			T2=tmp;
+			//T2=tmp;
 			//T1=(T1+tmp)/2;
 			
 			cout<<"\nJobs Completed: "<<sumOfK<<endl;
-			cout<<"\nJobs Remaining: "<<(atoi(argv[1])-sumOfK)<<endl;
+			cout<<"Jobs Remaining: "<<(atoi(argv[1])-sumOfK)<<endl;
+
+
+			
+			if(count!=0)	{
+				T1=(T1+T2)/2;
+			}
+
+
+			T2=tmp;
 			count++;
 		}
 		
@@ -106,12 +126,25 @@ int main(int argc, char **argv)      {
 			
 			cout<<"T1: "<<T1<<"\tT2: "<<T2<<flush;
 			
+			degradation=k;
 				k =  k/(c1*c1);
+				
+			if(k<1)	{
+				k=1;
+			}
 				count=0;
 				
 				cout<<"\n***** Degradation detected! Reducing number of jobs. *****"<<endl<<flush;
 				output<<"\n***** Degradation detected! Reducing number of jobs. *****"<<endl<<flush;
 			
+			dCount++;
+						
+		}
+		
+		
+		if(dCount==5)	{
+			degradation=0;
+			dCount=0;
 		}
 		
 		

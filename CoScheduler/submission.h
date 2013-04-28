@@ -31,7 +31,7 @@ public: submission(int k)	{
 		char tmp[100];
 		sprintf(tmp,"./genCondorScript %d > condor.script",N);
 		system(tmp);
-		sleep(1);
+		sleep(3);
 		system("condor_submit condor.script");
 		
 		return 0;
@@ -49,82 +49,76 @@ public: submission(int k)	{
 		ULogEvent *event = NULL;
 		
 		if(reader.isInitialized())	{
-			cout<<"Initialized reading log file\n"<<flush;
+			cout<<"\nInitialized reading log file\n"<<flush;
 		}
 		else{
 			cout<<"ERROR! reading log file host.log"<<flush;
 		}
         
-		while (1) {
+        
+        return_value=system("condor_wait -num 1 host.log");
+        sleep(5);
+        
+        while(reader.readEvent(event)==ULOG_OK)	{
             
-            if(reader.readEvent(event)==ULOG_OK)	{
+            ostringstream cluster_proc;
+            
+            if((*event).eventNumber==ULOG_EXECUTE )	{
                 
-                ostringstream cluster_proc;
                 
-                if((*event).eventNumber==ULOG_EXECUTE || (*event).eventNumber==ULOG_JOB_TERMINATED)	{
-                    
-                    //return_value=system("condor_wait -num 1 host.log");
-                    //sleep(5);
-                    
-                    ExecuteEvent *exec = static_cast<ExecuteEvent*>(event);
-                    
-                    //	cout<<"Cluster proc: "<<endl;
-                    cluster_proc<<exec->cluster<<"."<<exec->proc<<"."<<exec->subproc;
-                    //	cout<<cluster_proc.str();
-                    //	cout<<"Event time: "<<endl;
-                    struct tm *tmp=&exec->eventTime;
-                    //cout<<timegm(tmp)<<endl;
-                    time_t epoch_time = timegm(tmp);
-                    
-                    //	cout<<epoch_time<<endl;
-                    // Pre-store all events that are ULOG_EXECUTE and store time/date of execution in a map.
-                    execute_times.insert(std::pair<string,unsigned long int>(cluster_proc.str(),epoch_time));
+                ExecuteEvent *exec = static_cast<ExecuteEvent*>(event);
+                
+                //	cout<<"Cluster proc: "<<endl;
+                cluster_proc<<exec->cluster<<"."<<exec->proc<<"."<<exec->subproc;
+                //	cout<<cluster_proc.str();
+                //	cout<<"Event time: "<<endl;
+                struct tm *tmp=&exec->eventTime;
+                //cout<<timegm(tmp)<<endl;
+                time_t epoch_time = timegm(tmp);
+                
+                //	cout<<epoch_time<<endl;
+                // Pre-store all events that are ULOG_EXECUTE and store time/date of execution in a map.
+                execute_times.insert(std::pair<string,unsigned long int>(cluster_proc.str(),epoch_time));
+                
+                sleep(2);
 
-                    if((*event).eventNumber==ULOG_EXECUTE)   {
-                        sleep(2);
-                        continue;
-                    }
+                count++;
+                //condor_wait -num K, where K is the amount of jobs completed till the wait.
+                if(count<=N)	{
+                    char tmp[100];
+                    sprintf(tmp,"condor_wait -num %d host.log",count);
+                    return_value=system(tmp);
+                    sleep(2);
+                }
+
+                
+                continue;
+            }
+            
+            if((*event).eventNumber==ULOG_JOB_TERMINATED)	{
+                
+                JobTerminatedEvent *term = static_cast<JobTerminatedEvent*>(event);
+                
+                if(term->normal)	{
+                    unsigned long total_time=term->run_remote_rusage.ru_utime.tv_sec+term->run_remote_rusage.ru_stime.tv_sec +
+                    term->run_local_rusage.ru_utime.tv_sec+term->run_local_rusage.ru_stime.tv_sec;
                     
-                    if((*event).eventNumber==ULOG_JOB_TERMINATED)	{
-                        
-                        JobTerminatedEvent *term = static_cast<JobTerminatedEvent*>(event);
-                        
-                        if(term->normal)	{
-                            unsigned long total_time=term->run_remote_rusage.ru_utime.tv_sec+term->run_remote_rusage.ru_stime.tv_sec +
-                            term->run_local_rusage.ru_utime.tv_sec+term->run_local_rusage.ru_stime.tv_sec;
-                            
-                            struct tm *tmpTime = &term->eventTime;
-                            
-                            time_t epoch_time_term = timegm(tmpTime);
-                            ostringstream cluster_proc_s;
-                            cluster_proc_s<<term->cluster<<"."<<term->proc<<"."<<term->subproc;
-                            job_term_times.insert(std::pair<string,unsigned long int> (cluster_proc_s.str(),epoch_time_term));
-                            
-                            avgRuntime+=total_time;
-                            //	output<<"Total time of job("<<count<<") is "<<total_time<<endl<<flush;
-                            
-                            //condor_wait -num K, where K is the amount of jobs completed till the wait.
-                            if(count<=N)	{
-                                delete event;
-                                char tmp[100];
-                                sprintf(tmp,"condor_wait -num %d host.log",count);
-                                return_value=system(tmp);
-                                sleep(2);
-                            }
-                            count++;
-                        }
-                        
-                    }
+                    struct tm *tmpTime = &term->eventTime;
+                    
+                    time_t epoch_time_term = timegm(tmpTime);
+                    ostringstream cluster_proc_s;
+                    cluster_proc_s<<term->cluster<<"."<<term->proc<<"."<<term->subproc;
+                    job_term_times.insert(std::pair<string,unsigned long int> (cluster_proc_s.str(),epoch_time_term));
+                    
+                    avgRuntime+=total_time;
+                    //	output<<"Total time of job("<<count<<") is "<<total_time<<endl<<flush;
+                    
                 }
                 
             }
-            
-            else {
-                return 0;
-            }
-			
         }
-		fclose(fp);	
+        
+		fclose(fp);
 	}
 	unsigned long int calculateWallClock()	{
 		
