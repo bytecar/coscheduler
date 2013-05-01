@@ -112,13 +112,18 @@ int main(int argc, char **argv)      {
 			cout<<"Jobs Remaining: "<<(atoi(argv[1])-sumOfK)<<endl;
 
 
-			
+			//Think a logic for degradation and average T1
 			if(count!=0)	{
-				T1=(T1+T2)/2;
+								
+					T1=(T1+T2)/2;
 			}
 
-
-			T2=tmp;
+			if(tmp < c2*T1)
+				T2=tmp;
+			else{
+				T2=T1;
+			}
+			
 			count++;
 		}
 		
