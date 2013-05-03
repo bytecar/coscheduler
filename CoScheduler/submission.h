@@ -6,15 +6,21 @@
 //  Copyright (c) 2013 Kartik Vedalaveni. All rights reserved.
 //
 
+//Interfaces talking to condor scheduler
+
 #ifndef CoScheduler_submission_h
 #define CoScheduler_submission_h
 #include <map>
+#include <list>
 #include <iostream>
 using namespace std;
 
 map<string,unsigned long int> execute_times;
 map<string,unsigned long int> job_term_times;
 map<string,unsigned long int> wallClockTimes;
+list<unsigned long int> wallClockList;
+
+extern ofstream output;
 
 class submission	{
 	
@@ -50,6 +56,7 @@ public: submission(int k)	{
 		
 		if(reader.isInitialized())	{
 			cout<<"\nInitialized reading log file\n"<<flush;
+			output<<"\nInitialized reading log file\n"<<flush;
 		}
 		else{
 			cout<<"ERROR! reading log file host.log"<<flush;
@@ -81,7 +88,7 @@ public: submission(int k)	{
                 execute_times.insert(std::pair<string,unsigned long int>(cluster_proc.str(),epoch_time));
                 
                 sleep(2);
-
+                
                 count++;
                 //condor_wait -num K, where K is the amount of jobs completed till the wait.
                 if(count<=N)	{
@@ -90,7 +97,7 @@ public: submission(int k)	{
                     return_value=system(tmp);
                     sleep(2);
                 }
-
+                
                 
                 continue;
             }
@@ -139,6 +146,8 @@ public: submission(int k)	{
 			}
 			
 			cout<<"WallClock: "<<wallClock<<endl;
+			output<<"WallClock: "<<wallClock<<endl;
+            wallClockList.push_back(wallClock);
 		}
 		
 		
