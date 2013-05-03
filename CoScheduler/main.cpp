@@ -7,26 +7,21 @@
 #include <map>
 #include <sstream>
 #include "submission.h"
+#include <ctime>
 #define Q_WAIT_TIME 900
 #define MAX 200
 using namespace std;
 
+unsigned long int T1=0,T2=0,sumOfK=0,maxJob=0, bestK=0;
+float c1=2,c2=1.25;
 
-int progression[MAX];
 ofstream output;
 
-
-int main(int argc, char **argv)      {
+//Job submission primitive
+unsigned long int jobSubmission(int k)	{
 	
-	//make sure count is zero here, for control flow purpose
-	int k=3,count=0, returnValue=0, sumOfK=0, degradation=1, dCount=0;
-	float c1=2,c2=1.20;
-	unsigned long int T1=0,T2=0,tmp=0, oldT2=0;
-	output.open("output.txt", std::ofstream::out | std::ofstream::app);
-	
-	//Submit and wait
-	sumOfK+=k;
-	
+	unsigned long int T=0;
+	int returnValue=99;
 	//Clear host.log
 	ofstream clear1("host.log",ios::trunc);
 	clear1.close();
@@ -37,7 +32,7 @@ int main(int argc, char **argv)      {
 	sleep(5); //Wait 5 seconds for log file to be written before its read.
 	if(returnValue==0)	{
 		s1.wait_calculate();
-		T1=s1.calculateWallClock();
+		T=s1.calculateWallClock();
 	}
 	else{
 		cout<<"Error completing job! Exiting!";
@@ -50,134 +45,184 @@ int main(int argc, char **argv)      {
 	execute_times.clear();
 	wallClockTimes.clear();
 	
-	cout<<"T1(average) "<<T1<<" over "<<s1.count-1<<" Jobs"<<endl<<flush;
-	output<<"T1(average) "<<T1<<" over "<<s1.count-1<<" Jobs"<<endl<<flush;
+	cout<<"T(average) "<<T<<" over "<<s1.count-1<<" Jobs"<<endl<<flush;
+	output<<"T(average) "<<T<<" over "<<s1.count-1<<" Jobs"<<endl<<flush;
 	
 	//Clear host.log
 	ofstream clear("host.log",ios::trunc);
 	clear.close();
 	sleep(5);
 	
-    while(1)
+	return T;
+}
+
+//Check for MaxJob limit
+bool maxJobLimit(int k)	{
+	
+	if((sumOfK+k)>=(maxJob))	{
+		return false;
+	}
+	else{
+		return true;
+	}
+}
+
+void lastIteration(int c1, int k)	{
+	//Last Iteration, Submit remaining jobs to complete exact set of input jobs.
+	if((sumOfK+k) > maxJob)	{
+		k = maxJob-sumOfK;
+		jobSubmission(k);
+		cout<<"\n\n\nJobs Completed!" <<"Count of jobs: "<<sumOfK+k<<endl<<flush;
+		output<<"\n\n\nJobs Completed!" <<"Count of jobs: "<<sumOfK+k<<endl<<flush;
+		exit(0);
+	}
+}
+
+
+//Best k for a given range around degraded value
+int optimalRun(int low, int high)	{
+	
+	int mid = (low+high)/2;
+	unsigned long int tmp=0;
+	
+	if(maxJobLimit(mid))	{
+		sumOfK+=mid;
+		tmp = jobSubmission(mid);
+		
+		T2=tmp;
+		cout<<"\nJobs Completed: "<<sumOfK<<endl;
+		cout<<"Jobs Remaining: "<<(maxJob-sumOfK)<<endl;
+		
+		output<<"\nJobs Completed: "<<sumOfK<<endl;
+		output<<"Jobs Remaining: "<<(maxJob-sumOfK)<<endl;
+		
+		if(tmp<c2*T1)	{
+			T1=(T1+tmp)/2;
+			if(low+2==high)	{
+				bestK = mid;
+				return(mid);
+			}
+			optimalRun(mid, high);
+		}
+		else{
+			cout<<"\n***** Degradation detected! Reducing number of jobs. *****"<<endl<<flush;
+			output<<"\n***** Degradation detected! Reducing number of jobs. *****"<<endl<<flush;
+			
+			if(low+2==high)	{
+				
+				//If the final value detected by binary search is degraded value, we choose a lower value
+				bestK=mid-1;
+				return(mid-1);
+			}
+			optimalRun(low, mid);
+		}
+	}
+	else{
+		lastIteration(c1,mid);
+		return mid;
+	}
+	
+}
+
+
+
+
+int main(int argc, char **argv)      {
+	
+	//make sure count is zero here, for control flow purpose
+	int k=1,degradation_high=1,degradation_low=1;
+	unsigned long int tmp=0;
+	maxJob = atoi(argv[1]);
+	
+	output.open("output.txt", ofstream::out);
+	
+	//Submit and wait
+	sumOfK+=k;
+	T1=jobSubmission(k);
+	
+	
+    while(true)
 	{
 		cout.flush();
 		
-		//to handle the initial case we include a control flow for count==0
-		if(T2 < c2*T1 || count==0)	{
+		//Normal execution, control block
+		if(T2 < c2*T1)	{
 			
 			k=c1*k; // If there is no degradation increase number of jobs submitted
 			
-			
-			
-			
-			if(k==degradation)	{
-
-				k = k/c1;
-				if(k<1)
-					k=1;
-			}
-
 			sumOfK+=k;
-			submission s2(k);
-			returnValue=s2.submit();
-			sleep(5);
-			if(returnValue==0)	{
-				s2.wait_calculate();
-				tmp=s2.calculateWallClock();
-				sleep(5);
-			}
-			else{
-				cout<<"Error completing job! Exciting!";
-				output<<"Error completing job! Exciting!";
-				exit(2);
-			}
-			
-			job_term_times.clear();
-			execute_times.clear();
-			wallClockTimes.clear();
-
-			cout<<"T2(average) "<<tmp<<" over "<<s2.count-1<<" Jobs"<<endl<<flush;
-			
-			//Clear host.log
-			ofstream clear1("host.log",ios::trunc);
-			clear1.close();
-			
-			sleep(5);
-
-			//After every two rounds of run, calculate global average time T1
-			//T2=tmp;
-			//T1=(T1+tmp)/2;
+			T2=jobSubmission(k);
 			
 			cout<<"\nJobs Completed: "<<sumOfK<<endl;
 			cout<<"Jobs Remaining: "<<(atoi(argv[1])-sumOfK)<<endl;
-
-
-			//Think a logic for degradation and average T1
-			if(count!=0)	{
-								
-					T1=(T1+T2)/2;
-			}
-
-			if(tmp < c2*T1)
-				T2=tmp;
-			else{
-				T2=T1;
-			}
 			
-			count++;
+			output<<"\nJobs Completed: "<<sumOfK<<endl;
+			output<<"Jobs Remaining: "<<(atoi(argv[1])-sumOfK)<<endl;
+			
+			if(T2< c2*T1){
+				T1=(T1+T2)/2;
+			}
 		}
 		
+		
+		//Degradation control block
 		if(T2> c2*T1){
 			
 			cout<<"T1: "<<T1<<"\tT2: "<<T2<<flush;
+			output<<"T1: "<<T1<<"\tT2: "<<T2<<flush;
 			
-			degradation=k;
-				k =  k/(c1*c1);
+			degradation_high=k;
+			degradation_low =k/c1;
+			
+			cout<<"\n***** Degradation detected! Reducing number of jobs. *****"<<endl<<flush;
+			output<<"\n***** Degradation detected! Reducing number of jobs. *****"<<endl<<flush;
+			
+			
+			//Find the optimal K for the
+			if((degradation_high-degradation_low)>0)
+				optimalRun(degradation_low,degradation_high);
+			
+			k=bestK;
+			unsigned int time=0;
+			
+			while(time<10*T1)	{
 				
-			if(k<1)	{
-				k=1;
-			}
-				count=0;
 				
-				cout<<"\n***** Degradation detected! Reducing number of jobs. *****"<<endl<<flush;
-				output<<"\n***** Degradation detected! Reducing number of jobs. *****"<<endl<<flush;
-			
-			dCount++;
-						
-		}
-		
-		
-		if(dCount==5)	{
-			degradation=0;
-			dCount=0;
-		}
-		
-		
-		if((sumOfK+c1*k) > atoi(argv[1]))	{
-
-			k = atoi(argv[1])-sumOfK;
-			submission s3(k);
-			returnValue=s3.submit();
-			sleep(5);
-			if(returnValue==0)	{
-				s3.wait_calculate();
-				tmp=s3.calculateWallClock();
+				if(maxJobLimit(k))	{
+					wallClockList.clear();
+					sumOfK+=k;
+					T2=jobSubmission(k);
+					
+					wallClockList.sort();
+					time += wallClockList.back();
+					
+					if(time>10*T1)
+						time=10*T1;
+					
+					cout<<"\nJobs Completed: "<<sumOfK<<endl;
+					cout<<"Jobs Remaining: "<<(atoi(argv[1])-sumOfK)<<endl;
+					cout<<"\n\nSeconds till search resumes:  "<<(10*T1-time)<<endl<<flush;
+					
+					output<<"\nJobs Completed: "<<sumOfK<<endl;
+					output<<"Jobs Remaining: "<<(atoi(argv[1])-sumOfK)<<endl;
+					output<<"\n\nSeconds till search resumes:  "<<(10*T1-time)<<endl<<flush;
+					
+				}
+				else{
+					lastIteration(c1,k);
+				}
+				
 			}
-			sleep(5);
-
-			job_term_times.clear();
-			execute_times.clear();
-			wallClockTimes.clear();
-
-			cout<<"T2(average) "<<tmp<<" over "<<k<<" Jobs"<<endl<<flush;
-			output<<"T2(average) "<<tmp<<" over "<<k<<" Jobs"<<endl<<flush;
 			
-			cout<<"\n\n\nJobs Completed!" <<"Count of jobs: "<<sumOfK+k<<endl<<flush;
-			output<<"\n\n\nJobs Completed!" <<"Count of jobs: "<<sumOfK+k<<endl<<flush;
-			exit(0);
 		}
+		
+		
+		
 	}
 	
 	output.close();
 	return 0;
 }
+
+
+
