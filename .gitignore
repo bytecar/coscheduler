@@ -1,0 +1,11 @@
+CoScheduler.xcodeproj/project.xcworkspace/contents.xcworkspacedata
+CoScheduler.xcodeproj/project.xcworkspace/xcuserdata/vkartik.xcuserdatad/UserInterfaceState.xcuserstate
+CoScheduler.xcodeproj/xcuserdata/vkartik.xcuserdatad/xcdebugger/Breakpoints.xcbkptlist
+CoScheduler.xcodeproj/xcuserdata/vkartik.xcuserdatad/xcschemes/CoScheduler.xcscheme
+CoScheduler.xcodeproj/xcuserdata/vkartik.xcuserdatad/xcschemes/xcschememanagement.plist
+CoScheduler/condor_event.h
+CoScheduler/libcondorapi.a
+CoScheduler/libcondorapi.dylib
+CoScheduler/read_user_log.h
+CoScheduler/user_log.c++.h
+CoScheduler/write_user_log.h
