@@ -27,6 +27,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		7F165C40173AA4940014E99F /* threaded.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = threaded.h; sourceTree = "<group>"; };
 		7F6E666016FDE65000A09B38 /* CoScheduler */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = CoScheduler; sourceTree = BUILT_PRODUCTS_DIR; };
 		7F6E666316FDE65000A09B38 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; usesTabs = 1; };
 		7F6E666516FDE65000A09B38 /* CoScheduler.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = CoScheduler.1; sourceTree = "<group>"; };
@@ -77,6 +78,7 @@
 				7F6E666D16FDE6AB00A09B38 /* read_user_log.h */,
 				7F6E666F16FDE6BB00A09B38 /* write_user_log.h */,
 				7F6E666516FDE65000A09B38 /* CoScheduler.1 */,
+				7F165C40173AA4940014E99F /* threaded.h */,
 			);
 			path = CoScheduler;
 			sourceTree = "<group>";
@@ -215,6 +217,11 @@
 		7F6E666A16FDE65000A09B38 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				HEADER_SEARCH_PATHS = (
+					"<Multiple",
+					"values>",
+					/usr/local/include/boost,
+				);
 				"HEADER_SEARCH_PATHS[arch=*]" = "./**";
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
@@ -224,13 +231,18 @@
 				MACH_O_TYPE = mh_execute;
 				"OTHER_LDFLAGS[arch=*]" = "-lcondorapi";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				"USER_HEADER_SEARCH_PATHS[arch=*]" = "./**";
+				USER_HEADER_SEARCH_PATHS = /usr/local/include;
 			};
 			name = Debug;
 		};
 		7F6E666B16FDE65000A09B38 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				HEADER_SEARCH_PATHS = (
+					"<Multiple",
+					"values>",
+					/usr/local/include/boost,
+				);
 				"HEADER_SEARCH_PATHS[arch=*]" = "./**";
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
