@@ -11,8 +11,6 @@
 #include<iostream>
 
 
-
-
 class resource	{
 	
 public:
@@ -43,6 +41,7 @@ typedef struct args	{
 }args;
 
 
+//Wait condotion for thread, defining a conditional varible(adapted from stackoverflow.com)
 void mywait(int timeInSec)
 {
 	

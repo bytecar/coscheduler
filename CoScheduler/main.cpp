@@ -1,3 +1,12 @@
+//
+//  threaded.h
+//  CoScheduler
+//
+//  Created by Kartik Vedalaveni on 5/8/13.
+//  Copyright (c) 2013 Kartik Vedalaveni. All rights reserved.
+//
+
+
 #include <iostream>
 #include <sys/time.h>
 #include <cstdlib>
@@ -21,40 +30,82 @@ resource stats[MAXSITES];
 string gridSites[MAXSITES], genFiles[MAXSITES], hostFiles[MAXSITES];
 ofstream output[MAXSITES];
 
+//For multiple sites algorithm
+list<int> multipleSitesTime;
+map<int,int> tid_multipleSiteTime;
+
 int optimalRun(int,int,resource*);
 bool maxJobLimit(int);
 void lastIteration(int, int, resource*);
 unsigned int jobSubmission(int,args *);
+void updateJobPropagationConstant(int,resource *);
 
+void updateJobPropagationConstant(resource *data)	{
+	int high=0, low=0, average=0;
+	
+	multipleSitesTime.sort();
+	low = multipleSitesTime.front();
+	high = multipleSitesTime.back();
+	
+	for (std::list<int>::iterator it = multipleSitesTime.begin(); it != multipleSitesTime.end(); it++)	{
+		average+=*it;
+	}
+	
+	average = average/multipleSitesTime.size();
+	
+	map<int,int>::iterator test;
+	for(std::map<int,int>::iterator it=tid_multipleSiteTime.begin(); it!=tid_multipleSiteTime.end(); ++it)
+	{
+		if(it->second==low)	{
+			pthread_mutex_lock (&mymutex);
+			data->c1=(data->c1)*4;
+			pthread_mutex_unlock (&mymutex);
+				output[data->tid]<<"\nC1 updated to "<<data->c1<<endl;
+		}
+		else if(it->second==high)	{
+			pthread_mutex_lock (&mymutex);
+			data->c1=((data->c1)/2)>1?((data->c1)/2):1;
+			pthread_mutex_unlock (&mymutex);
+				output[data->tid]<<"\nC1 updated to "<<data->c1<<endl;
+		}
+		else if(it->second<average)	{
+			pthread_mutex_lock (&mymutex);
+			data->c1=(data->c1)*2;
+			pthread_mutex_unlock (&mymutex);
+				output[data->tid]<<"\nC1 updated to "<<data->c1<<endl;
+		}
+	}
+	
+
+
+}
 
 void capacityDetection(resource *data)	{
 	
-	int k = data->kValue;
-	unsigned int T1 = data->T1;
-	unsigned int T2 = data->T2;
-	float c1 = data->c1;
-	float c2 = data->c2;
 	int thread_id = data->tid;
 	int degradation_high = data->degradation_high;
 	int degradation_low = data->degradation_low;
+	pthread_mutex_t syncMutex = PTHREAD_MUTEX_INITIALIZER;
+	pthread_cond_t synchronize_cv = PTHREAD_COND_INITIALIZER;
 	
 	while(true)
 	{
 		cout.flush();
 		
 		//Normal execution, control block
-		if(T2 < c2*T1)	{
+		if(data->T2 < data->c2*data->T1)	{
 			
-			k=c1*k;
 			
-			if(maxJobLimit(k))	{
+			data->kValue=(data->c1)*(data->kValue);
+			
+			if(maxJobLimit(data->kValue))	{
 				 // If there is no degradation increase number of jobs submitted
 				
-				arguments[thread_id].kValue=k;
-				jobSubmission(k,&arguments[thread_id]);
+				//arguments[thread_id].kValue=k;
+				jobSubmission(data->kValue,&arguments[thread_id]);
 				
 				//taken care of T2 initialization in jobSubmission function
-				T2 = data->T2;
+				//T2 = data->T2;
 				
 				cout<<"\nJobs Completed: "<<sumOfK<<endl;
 				cout<<"Jobs Remaining: "<<(maxJob-sumOfK)<<endl;
@@ -62,29 +113,64 @@ void capacityDetection(resource *data)	{
 				output[thread_id]<<"\nJobs Completed (or in Progress) : "<<sumOfK<<endl;
 				output[thread_id]<<"Jobs Remaining                    : "<<(maxJob-sumOfK)<<endl;
 				
-				if(T2< c2*T1){
-					T1=(T1+T2)/2;
+				if(data->T2< data->c2*data->T1){
+					data->T1=(data->T1+data->T2)/2;
+					
 				}
+
+				pthread_mutex_lock (&mymutex);
+				multipleSitesTime.push_back(stats[thread_id].T2);
+				pthread_mutex_unlock (&mymutex);
+				
+				pthread_mutex_lock (&mymutex);
+				tid_multipleSiteTime.insert(std::pair<int,int>(data->tid,data->T2));
+				pthread_mutex_unlock (&mymutex);
+				
+				mywait(3);
+				
+				if(data->tid==0)	{
+					pthread_mutex_lock(&syncMutex);
+					while(multipleSitesTime.size()<numOfSites)	{
+						pthread_cond_wait(&synchronize_cv, &syncMutex);
+					}
+					pthread_mutex_unlock(&syncMutex);
+				}
+				else{
+					
+					pthread_mutex_lock(&syncMutex);
+					if(numOfSites==multipleSitesTime.size())	{
+						pthread_cond_signal(&synchronize_cv);
+					}
+					pthread_mutex_unlock(&syncMutex);
+					
+				}
+				if(multipleSitesTime.size()>0)	{
+					updateJobPropagationConstant(data);
+				}
+				
+				tid_multipleSiteTime.clear();
+				multipleSitesTime.clear();
+
 			}
 			else{
-				lastIteration(c1, k, data);
+				lastIteration(data->c1, data->kValue, data);
 			}
 		}
 		
 		//Re-read T1's updated data
-		data->T1 = T1;
+		//data->T1 = T1;
 		
 		//Degradation control block
-		if(T2> c2*T1){
+		if(data->T2> data->c2*data->T1){
 			
-			cout<<"T1: "<<T1<<"\tT2: "<<T2<<flush;
-			output[thread_id]<<"T1: "<<T1<<"\tT2: "<<T2<<flush;
+			cout<<"T1: "<<data->T1<<"\tT2: "<<data->T2<<flush;
+			output[thread_id]<<"T1: "<<data->T1<<"\tT2: "<<data->T2<<flush;
 			
-			degradation_high=k;
-			data->degradation_high = k;
+			degradation_high=data->kValue;
+			data->degradation_high = data->kValue;
 			
-			degradation_low =k/c1;
-			data->degradation_low = k/c1;
+			degradation_low =((data->kValue)/(data->c1)==0?1:(data->kValue/data->c1));
+			data->degradation_low = ((data->kValue)/(data->c1)==0?1:(data->kValue/data->c1));
 			
 			cout<<"\n***** Degradation detected! Reducing number of jobs. *****"<<endl<<flush;
 			output[thread_id]<<"\n***** Degradation detected! Reducing number of jobs. *****"<<endl<<flush;
@@ -95,35 +181,36 @@ void capacityDetection(resource *data)	{
 				optimalRun(degradation_low,degradation_high, data);
 			
 			//Get best value here
-			k=data->bestKValue;
+			data->kValue=data->bestKValue;
 			unsigned int time=0;
 			
-			while(time<10*T1)	{
+			while(time<10*data->T1)	{
 				
-				if(maxJobLimit(k))	{
+				if(maxJobLimit(data->kValue))	{
 					wallClockList[thread_id].clear();
-					arguments[thread_id].kValue=k;
-					jobSubmission(k,&arguments[thread_id]);
 					
-					T2 = data->T2;
+					//arguments[thread_id].kValue=k;
+					jobSubmission(data->kValue,&arguments[thread_id]);
+					
+					//T2 = data->T2;
 					
 					wallClockList[thread_id].sort();
 					time += wallClockList[thread_id].back();
 					
-					if(time>10*T1)
-						time=10*T1;
+					if(time>10*data->T1)
+						time=10*data->T1;
 					
 					cout<<"\nJobs Completed(or In progress): "<<sumOfK<<endl;
 					cout<<"Jobs Remaining                  : "<<maxJob-sumOfK<<endl;
-					cout<<"\n\nSeconds till search resumes :  "<<(10*T1-time)<<endl<<flush;
+					cout<<"\n\nSeconds till search resumes :  "<<(10*data->T1-time)<<endl<<flush;
 					
 					output[thread_id]<<"\nJobs Completed (or In progress): "<<sumOfK<<endl;
 					output[thread_id]<<"Jobs Remaining                   : "<<maxJob-sumOfK<<endl;
-					output[thread_id]<<"\n\nSeconds till search resumes  :  "<<(10*T1-time)<<endl<<flush;
+					output[thread_id]<<"\n\nSeconds till search resumes  :  "<<(10*(data->T1)-time)<<endl<<flush;
 					
 				}
 				else{
-					lastIteration(c1,k,data);
+					lastIteration(data->c1,data->kValue,data);
 				}
 				
 			}
@@ -277,8 +364,11 @@ void lastIteration(int c1, int k, resource* data)	{
 		k = maxJob-sumOfK;
 		arguments[data->tid].kValue=k;
 		jobSubmission(k,&arguments[data->tid]);
-		cout<<"\n\n\nJobs Completed!" <<"Count of jobs: "<<sumOfK+k<<endl<<flush;
-		output[data->tid]<<"\n\n\nJobs Completed!" <<"Count of jobs: "<<sumOfK+k<<endl<<flush;
+//		cout<<"\n\n\nJobs Completed!" <<"Count of jobs: "<<sumOfK+k<<endl<<flush;
+//		output[data->tid]<<"\n\n\nJobs Completed!" <<"Count of jobs: "<<sumOfK+k<<endl<<flush;
+		
+		cout<<"\n\n\nJobs Completed!" <<endl<<flush;
+		output[data->tid]<<"\n\n\nJobs Completed!" <<endl<<flush;
 		pthread_exit(&ret1);
 	}
 }
@@ -291,11 +381,9 @@ int optimalRun(int low, int high,resource *data)	{
 	unsigned long int tmp=0;
 	
 	if(maxJobLimit(mid))	{
-		/*pthread_mutex_lock (&mymutex);
-		 sumOfK+=mid;
-		 pthread_mutex_unlock (&mymutex);*/
-		
+
 		arguments[data->tid].kValue=mid;
+		//sumofk is updated in job submission, not required here
 		jobSubmission(mid,&arguments[data->tid]);
 		
 		tmp=data->T2;
@@ -378,7 +466,7 @@ int main(int argc, char **argv)      {
 		
 	    dst<<src.rdbuf();
 		dst<<"echo \"grid_resource=gt5 "<<gridSites[i]<<"\""<<endl;
-		dst<<"echo \"log= "<<hostFile<<"\""<<endl;
+		dst<<"echo \"log="<<hostFile<<"\""<<endl;
 		dst<<"echo \"queue $1\""<<endl;
 		
 		dst.close();

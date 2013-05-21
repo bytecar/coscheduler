@@ -62,7 +62,7 @@ public: submission(int k)	{
 		
 		FILE *fp;
 		int return_value=99;
-        
+        int t=data->tid;
 		int avgRuntime=0;
 		fp=fopen(hostFile.c_str(), "r");
 		ReadUserLog reader(fp,false,false);
@@ -99,15 +99,9 @@ public: submission(int k)	{
                 //cout<<timegm(tmp)<<endl;
                 time_t epoch_time = timegm(tmp);
                 
-                for(int t=0;t<nSites;t++)   {
-                    
-                    if(t==data->tid)    {
-                        
-                        // Pre-store all events that are ULOG_EXECUTE and store time/date of execution in a map.
-                        execute_times[t].insert(std::pair<string,unsigned long int>(cluster_proc.str(),epoch_time));
-                        
-                    }
-                }
+                // Pre-store all events that are ULOG_EXECUTE and store time/date of execution in a map.
+               // execute_times[t].insert(std::pair<string,unsigned long int>(cluster_proc.str(),epoch_time));
+                
                 mywait(2);
                 
                 count++;
@@ -129,24 +123,34 @@ public: submission(int k)	{
                 JobTerminatedEvent *term = static_cast<JobTerminatedEvent*>(event);
                 
                 if(term->normal)	{
+                    
+                    //Works only for local jobs, find the CPU time of local jobs
                     unsigned long total_time=term->run_remote_rusage.ru_utime.tv_sec+term->run_remote_rusage.ru_stime.tv_sec +
                     term->run_local_rusage.ru_utime.tv_sec+term->run_local_rusage.ru_stime.tv_sec;
                     
                     struct tm *tmpTime = &term->eventTime;
                     
                     time_t epoch_time_term = timegm(tmpTime);
-                    ostringstream cluster_proc_s;
+                    ostringstream cluster_proc_s,cluster_proc_only;
                     cluster_proc_s<<term->cluster<<"."<<term->proc<<"."<<term->subproc;
+                    cluster_proc_only<<term->cluster<<"."<<term->proc;
+
+                    //job_term_times[t].insert(std::pair<string,unsigned long int> (cluster_proc_s.str(),epoch_time_term));
+
+
+                    string str;
+                    char timeVar[100];
                     
-                    for(int t=0;t<nSites;t++)   {
-                        
-                        if(t==data->tid)    {
-                            
-                            
-                            job_term_times[t].insert(std::pair<string,unsigned long int> (cluster_proc_s.str(),epoch_time_term));
-                            
-                        }
-                    }
+                    //parse the time.{cluster}.{process} file 
+                    sprintf(timeVar,"time.%s",cluster_proc_only.str().c_str());
+                    ifstream file(timeVar);
+                    getline(file,str);
+                    unsigned long int time_epoch = atoi(str.c_str());
+                    execute_times[t].insert(std::pair<string,unsigned long int>(cluster_proc_s.str(),time_epoch));
+                    getline(file,str);
+                    time_epoch = atoi(str.c_str());
+                    job_term_times[t].insert(std::pair<string,unsigned long int> (cluster_proc_s.str(),time_epoch));
+                    file.close();                    
                     avgRuntime+=total_time;
                     //	output<<"Total time of job("<<count<<") is "<<total_time<<endl<<flush;
                     
