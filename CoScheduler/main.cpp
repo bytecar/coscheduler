@@ -1,5 +1,5 @@
 //
-//  threaded.h
+//  main.cpp
 //  CoScheduler
 //
 //  Created by Kartik Vedalaveni on 5/8/13.
@@ -60,24 +60,24 @@ void updateJobPropagationConstant(resource *data)	{
 			pthread_mutex_lock (&mymutex);
 			data->c1=(data->c1)*4;
 			pthread_mutex_unlock (&mymutex);
-				output[data->tid]<<"\nC1 updated to "<<data->c1<<endl;
+			output[data->tid]<<"\nC1 updated to "<<data->c1<<endl;
 		}
 		else if(it->second==high)	{
 			pthread_mutex_lock (&mymutex);
 			data->c1=((data->c1)/2)>1?((data->c1)/2):1;
 			pthread_mutex_unlock (&mymutex);
-				output[data->tid]<<"\nC1 updated to "<<data->c1<<endl;
+			output[data->tid]<<"\nC1 updated to "<<data->c1<<endl;
 		}
 		else if(it->second<average)	{
 			pthread_mutex_lock (&mymutex);
 			data->c1=(data->c1)*2;
 			pthread_mutex_unlock (&mymutex);
-				output[data->tid]<<"\nC1 updated to "<<data->c1<<endl;
+			output[data->tid]<<"\nC1 updated to "<<data->c1<<endl;
 		}
 	}
 	
-
-
+	
+	
 }
 
 void capacityDetection(resource *data)	{
@@ -95,11 +95,11 @@ void capacityDetection(resource *data)	{
 		//Normal execution, control block
 		if(data->T2 < data->c2*data->T1)	{
 			
-			
+			// If there is no degradation increase number of jobs submitted
 			data->kValue=(data->c1)*(data->kValue);
 			
 			if(maxJobLimit(data->kValue))	{
-				 // If there is no degradation increase number of jobs submitted
+				
 				
 				//arguments[thread_id].kValue=k;
 				jobSubmission(data->kValue,&arguments[thread_id]);
@@ -117,7 +117,18 @@ void capacityDetection(resource *data)	{
 					data->T1=(data->T1+data->T2)/2;
 					
 				}
-
+				
+				if(!multipleSitesTime.empty())	{
+					pthread_mutex_lock (&mymutex);
+					int tmp=tid_multipleSiteTime.at(data->tid);
+					multipleSitesTime.remove(tmp);
+					pthread_mutex_unlock (&mymutex);
+				}
+				
+				pthread_mutex_lock (&mymutex);
+				tid_multipleSiteTime.erase(data->tid);
+				pthread_mutex_unlock (&mymutex);
+				
 				pthread_mutex_lock (&mymutex);
 				multipleSitesTime.push_back(stats[thread_id].T2);
 				pthread_mutex_unlock (&mymutex);
@@ -128,7 +139,7 @@ void capacityDetection(resource *data)	{
 				
 				mywait(3);
 				
-				if(data->tid==0)	{
+				if(data->tid!=0)	{
 					pthread_mutex_lock(&syncMutex);
 					while(multipleSitesTime.size()<numOfSites)	{
 						pthread_cond_wait(&synchronize_cv, &syncMutex);
@@ -144,13 +155,13 @@ void capacityDetection(resource *data)	{
 					pthread_mutex_unlock(&syncMutex);
 					
 				}
+				
 				if(multipleSitesTime.size()>0)	{
 					updateJobPropagationConstant(data);
 				}
 				
-				tid_multipleSiteTime.clear();
-				multipleSitesTime.clear();
-
+				
+				
 			}
 			else{
 				lastIteration(data->c1, data->kValue, data);
@@ -364,8 +375,8 @@ void lastIteration(int c1, int k, resource* data)	{
 		k = maxJob-sumOfK;
 		arguments[data->tid].kValue=k;
 		jobSubmission(k,&arguments[data->tid]);
-//		cout<<"\n\n\nJobs Completed!" <<"Count of jobs: "<<sumOfK+k<<endl<<flush;
-//		output[data->tid]<<"\n\n\nJobs Completed!" <<"Count of jobs: "<<sumOfK+k<<endl<<flush;
+		//		cout<<"\n\n\nJobs Completed!" <<"Count of jobs: "<<sumOfK+k<<endl<<flush;
+		//		output[data->tid]<<"\n\n\nJobs Completed!" <<"Count of jobs: "<<sumOfK+k<<endl<<flush;
 		
 		cout<<"\n\n\nJobs Completed!" <<endl<<flush;
 		output[data->tid]<<"\n\n\nJobs Completed!" <<endl<<flush;
@@ -381,7 +392,7 @@ int optimalRun(int low, int high,resource *data)	{
 	unsigned long int tmp=0;
 	
 	if(maxJobLimit(mid))	{
-
+		
 		arguments[data->tid].kValue=mid;
 		//sumofk is updated in job submission, not required here
 		jobSubmission(mid,&arguments[data->tid]);
@@ -431,9 +442,13 @@ int main(int argc, char **argv)      {
 	int k=1;
 	maxJob = atoi(argv[1]);
 	
+	if(sizeof(argv)!=4)	{
+		cout<<"Usage: ./Scheduler \"num of jobs\" \"sites information file\" \"submitScript information\" "<<endl;
+		exit(1);
+	}
 	
-	//Check "sites" file and create that many hosts
-	ifstream sites("sites");
+	//take argv2 input as sites file and create that many hosts
+	ifstream sites(argv[2]);
 	int i=0;
 	if(!sites.is_open())	{
 		cout<<"\nUnable to open File sites, Exiting!"<<endl;
@@ -457,7 +472,9 @@ int main(int argc, char **argv)      {
 	
 	while(i<numOfSites)	{
 		char genScript[100], hostFile[100];
-		ifstream src("submitScript");
+		
+		//take argv3 input as submitScript file
+		ifstream src(argv[3]);
 		sprintf(genScript,"genScript%d",i);
 		sprintf(hostFile,"host%d.log",i);
 		genFiles[i] = genScript;
