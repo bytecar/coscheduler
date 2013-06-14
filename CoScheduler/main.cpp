@@ -23,6 +23,9 @@
 using namespace std;
 
 pthread_mutex_t mymutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t syncMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t synchronize_cv = PTHREAD_COND_INITIALIZER;
+
 unsigned long int maxJob=0,sumOfK=0, T=0,ret1;
 int numOfSites=0;
 args arguments[MAXSITES];
@@ -40,7 +43,7 @@ void lastIteration(int, int, resource*);
 unsigned int jobSubmission(int,args *);
 void updateJobPropagationConstant(int,resource *);
 
-void updateJobPropagationConstant(resource *data)	{
+int updateJobPropagationConstant(resource *data)	{
 	int high=0, low=0, average=0;
 	
 	multipleSitesTime.sort();
@@ -53,28 +56,37 @@ void updateJobPropagationConstant(resource *data)	{
 	
 	average = average/multipleSitesTime.size();
 	
-	map<int,int>::iterator test;
+	int it = tid_multipleSiteTime.at(data->tid);
+	if(it==low)	{
+		pthread_mutex_lock (&mymutex);
+		data->c1=(data->c1)*4;
+		pthread_mutex_unlock (&mymutex);
+		output[data->tid]<<"\nC1 updated to "<<data->c1<<endl;
+		
+		return 0;
+	}
+	else if(it==high)	{
+		pthread_mutex_lock (&mymutex);
+		data->c1=((data->c1)/2)>1?((data->c1)/2):1;
+		pthread_mutex_unlock (&mymutex);
+		output[data->tid]<<"\nC1 updated to "<<data->c1<<endl;
+		
+		return 0;
+	}
+	else if(it<average)	{
+		pthread_mutex_lock (&mymutex);
+		data->c1=(data->c1)*2;
+		pthread_mutex_unlock (&mymutex);
+		output[data->tid]<<"\nC1 updated to "<<data->c1<<endl;
+		
+		return 0;
+	}
+	
+	/*map<int,int>::iterator test;
 	for(std::map<int,int>::iterator it=tid_multipleSiteTime.begin(); it!=tid_multipleSiteTime.end(); ++it)
 	{
-		if(it->second==low)	{
-			pthread_mutex_lock (&mymutex);
-			data->c1=(data->c1)*4;
-			pthread_mutex_unlock (&mymutex);
-			output[data->tid]<<"\nC1 updated to "<<data->c1<<endl;
-		}
-		else if(it->second==high)	{
-			pthread_mutex_lock (&mymutex);
-			data->c1=((data->c1)/2)>1?((data->c1)/2):1;
-			pthread_mutex_unlock (&mymutex);
-			output[data->tid]<<"\nC1 updated to "<<data->c1<<endl;
-		}
-		else if(it->second<average)	{
-			pthread_mutex_lock (&mymutex);
-			data->c1=(data->c1)*2;
-			pthread_mutex_unlock (&mymutex);
-			output[data->tid]<<"\nC1 updated to "<<data->c1<<endl;
-		}
-	}
+		
+	}*/
 	
 	
 	
@@ -85,8 +97,6 @@ void capacityDetection(resource *data)	{
 	int thread_id = data->tid;
 	int degradation_high = data->degradation_high;
 	int degradation_low = data->degradation_low;
-	pthread_mutex_t syncMutex = PTHREAD_MUTEX_INITIALIZER;
-	pthread_cond_t synchronize_cv = PTHREAD_COND_INITIALIZER;
 	
 	while(true)
 	{
@@ -96,7 +106,7 @@ void capacityDetection(resource *data)	{
 		if(data->T2 < data->c2*data->T1)	{
 			
 			// If there is no degradation increase number of jobs submitted
-			data->kValue=(data->c1)*(data->kValue);
+			data->kValue=(data->c1);
 			
 			if(maxJobLimit(data->kValue))	{
 				
@@ -122,39 +132,21 @@ void capacityDetection(resource *data)	{
 					pthread_mutex_lock (&mymutex);
 					int tmp=tid_multipleSiteTime.at(data->tid);
 					multipleSitesTime.remove(tmp);
+					
+					multipleSitesTime.push_back(stats[thread_id].T2);
 					pthread_mutex_unlock (&mymutex);
 				}
 				
+				if(!tid_multipleSiteTime.empty())	{
 				pthread_mutex_lock (&mymutex);
 				tid_multipleSiteTime.erase(data->tid);
-				pthread_mutex_unlock (&mymutex);
-				
-				pthread_mutex_lock (&mymutex);
-				multipleSitesTime.push_back(stats[thread_id].T2);
-				pthread_mutex_unlock (&mymutex);
-				
-				pthread_mutex_lock (&mymutex);
 				tid_multipleSiteTime.insert(std::pair<int,int>(data->tid,data->T2));
 				pthread_mutex_unlock (&mymutex);
+				}
 				
 				mywait(3);
 				
-				if(data->tid!=0)	{
-					pthread_mutex_lock(&syncMutex);
-					while(multipleSitesTime.size()<numOfSites)	{
-						pthread_cond_wait(&synchronize_cv, &syncMutex);
-					}
-					pthread_mutex_unlock(&syncMutex);
-				}
-				else{
-					
-					pthread_mutex_lock(&syncMutex);
-					if(numOfSites==multipleSitesTime.size())	{
-						pthread_cond_signal(&synchronize_cv);
-					}
-					pthread_mutex_unlock(&syncMutex);
-					
-				}
+				cout<<"Number Of Sites: ="<<numOfSites<<" MultipleSitesTimeSize ="<<multipleSitesTime.size();
 				
 				if(multipleSitesTime.size()>0)	{
 					updateJobPropagationConstant(data);
@@ -234,6 +226,16 @@ void capacityDetection(resource *data)	{
 	
 }
 
+void* watchCode(void *watchArgs)	{
+	
+	pthread_mutex_lock(&syncMutex);
+	if(numOfSites==multipleSitesTime.size())	{
+		pthread_cond_signal(&synchronize_cv);
+	}
+	pthread_mutex_unlock(&syncMutex);
+	
+	pthread_exit(&ret1);
+}
 
 //Job submission primitive
 void* jobSubmissionThreaded(void *threadArg)	{
@@ -270,6 +272,50 @@ void* jobSubmissionThreaded(void *threadArg)	{
 	//sleep(5);
 	mywait(5);
 	
+	
+	cout<<"Number Of Sites: ="<<numOfSites<<" MultipleSitesTimeSize ="<<multipleSitesTime.size();
+	
+/*	if(data->tid==0)	{
+		
+			
+		pthread_mutex_lock(&syncMutex);
+		if(numOfSites==multipleSitesTime.size())	{
+			pthread_cond_signal(&synchronize_cv);
+		}
+		pthread_cond_broadcast(&synchronize_cv);
+		pthread_mutex_unlock(&syncMutex);
+
+	}
+	else{
+		
+		pthread_mutex_lock(&syncMutex);
+		while(multipleSitesTime.size()<numOfSites)	{
+			pthread_cond_wait(&synchronize_cv, &syncMutex);
+		}
+		pthread_mutex_unlock(&syncMutex);
+	}
+*/
+	pthread_mutex_lock(&syncMutex);
+    
+	multipleSitesTime.push_back(stats[thread_id].T1);
+	
+	tid_multipleSiteTime.insert(std::pair<int,int>(data->tid,stats[thread_id].T1));
+	
+    
+    if ( multipleSitesTime.size() < numOfSites )
+    {
+        pthread_cond_wait(&synchronize_cv, &syncMutex);
+    }
+    else
+    {
+		
+        pthread_cond_broadcast(&synchronize_cv);
+    }
+    
+    pthread_mutex_unlock(&syncMutex);
+
+
+
 	T = stats[thread_id].T1;
 	job_term_times[thread_id].clear();
 	execute_times[thread_id].clear();
@@ -278,7 +324,7 @@ void* jobSubmissionThreaded(void *threadArg)	{
 	cout<<"T(average) "<<T<<" over "<<s1.count-1<<" Jobs"<<endl<<flush;
 	output[thread_id]<<"T(average) "<<T<<" over "<<s1.count-1<<" Jobs"<<endl<<endl<<flush;
 	
-	//Clear host.log
+		//Clear host.log
 	ofstream clear(host.c_str(),ios::trunc);
 	clear.close();
 	//sleep(5);
@@ -296,12 +342,7 @@ void* jobSubmissionThreaded(void *threadArg)	{
 	stats[thread_id].degradation_low=1;
 	stats[thread_id].degradation_high=1;
 	
-	
 	capacityDetection(&stats[thread_id]);
-	
-	
-	
-	
 }
 
 
@@ -320,8 +361,12 @@ unsigned int jobSubmission(int kValue,args *data)	{
 	//sleep(5);
 	mywait(5);
 	
+	if(k>=maxJob)	{
+		output[thread_id]<<"Jobs Done! Exiting!";
+	}
 	submission s1(k);
 	returnValue=s1.submit(geninfo, data);
+	mywait(3);
 	pthread_mutex_lock (&mymutex);
 	sumOfK+=k;
 	pthread_mutex_unlock (&mymutex);
@@ -441,11 +486,6 @@ int main(int argc, char **argv)      {
 	
 	int k=1;
 	maxJob = atoi(argv[1]);
-	
-	if(sizeof(argv)!=4)	{
-		cout<<"Usage: ./Scheduler \"num of jobs\" \"sites information file\" \"submitScript information\" "<<endl;
-		exit(1);
-	}
 	
 	//take argv2 input as sites file and create that many hosts
 	ifstream sites(argv[2]);
