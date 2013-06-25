@@ -146,7 +146,7 @@ void capacityDetection(resource *data)	{
 				
 				mywait(3);
 				
-				cout<<"Number Of Sites: ="<<numOfSites<<" MultipleSitesTimeSize ="<<multipleSitesTime.size();
+				//cout<<"Number Of Sites: ="<<numOfSites<<" MultipleSitesTimeSize ="<<multipleSitesTime.size();
 				
 				if(multipleSitesTime.size()>0)	{
 					updateJobPropagationConstant(data);
@@ -156,7 +156,7 @@ void capacityDetection(resource *data)	{
 				
 			}
 			else{
-				lastIteration(data->c1, data->kValue, data);
+			lastIteration(data->c1, data->kValue, data);
 			}
 		}
 		
@@ -215,9 +215,7 @@ void capacityDetection(resource *data)	{
 				else{
 					lastIteration(data->c1,data->kValue,data);
 				}
-				
 			}
-			
 		}
 		
 		
@@ -273,7 +271,7 @@ void* jobSubmissionThreaded(void *threadArg)	{
 	mywait(5);
 	
 	
-	cout<<"Number Of Sites: ="<<numOfSites<<" MultipleSitesTimeSize ="<<multipleSitesTime.size();
+	//cout<<"Number Of Sites: ="<<numOfSites<<" MultipleSitesTimeSize ="<<multipleSitesTime.size();
 	
 /*	if(data->tid==0)	{
 		
@@ -361,8 +359,8 @@ unsigned int jobSubmission(int kValue,args *data)	{
 	//sleep(5);
 	mywait(5);
 	
-	if(k>=maxJob)	{
-		output[thread_id]<<"Jobs Done! Exiting!";
+	if(k==0)	{
+		k=1;
 	}
 	submission s1(k);
 	returnValue=s1.submit(geninfo, data);
@@ -553,10 +551,10 @@ int main(int argc, char **argv)      {
 		i++;
 	}
 	
+	output[i].close();
+	
 	for(int i=0;i<numOfSites;i++)	{
 		pthread_join(threads[i], NULL);
-		output[i].close();
-		
 	}
 	
 	

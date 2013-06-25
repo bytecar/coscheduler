@@ -40,7 +40,7 @@ public: submission(int k)	{
 	int submit(string geninfoScript, args *data)	{
 		char tmp[100];
         
-        if(N==0 || N>=maxJob)    {
+        if(N>=maxJob)    {
             
             output[data->tid]<<"Done! Exiting!"<<endl<<flush;
             pthread_exit(&return1);
